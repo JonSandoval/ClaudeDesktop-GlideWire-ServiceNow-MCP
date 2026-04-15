@@ -1,0 +1,214 @@
+import { z } from "zod";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ServiceNowClient } from "./servicenow.js";
+
+export function registerTools(server: McpServer, client: ServiceNowClient): void {
+  server.registerTool(
+    "list_records",
+    {
+      description:
+        "List records from a ServiceNow table. Supports filtering, field selection, and pagination.",
+      inputSchema: {
+        tableName: z
+          .string()
+          .describe("ServiceNow table name (e.g. 'incident', 'sys_user', 'change_request')"),
+        query: z
+          .string()
+          .optional()
+          .describe("Encoded query string (e.g. 'active=true^priority=1^ORDERBYnumber')"),
+        fields: z
+          .string()
+          .optional()
+          .describe("Comma-separated field names to return (e.g. 'number,short_description,state')"),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(500)
+          .optional()
+          .describe("Max records to return, 1-500 (default 50)"),
+        offset: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe("Starting record index for pagination (default 0)"),
+        displayValue: z
+          .enum(["true", "false", "all"])
+          .optional()
+          .describe("Return display values instead of raw: 'true', 'false', or 'all' (default 'false')"),
+      },
+      annotations: {
+        readOnlyHint: true,
+      },
+    },
+    async ({ tableName, query, fields, limit, offset, displayValue }) => {
+      try {
+        const records = await client.listRecords(tableName, {
+          query,
+          fields,
+          limit,
+          offset,
+          displayValue,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(records, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? error.message : String(error),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "get_record",
+    {
+      description: "Get a single record from a ServiceNow table by its sys_id.",
+      inputSchema: {
+        tableName: z
+          .string()
+          .describe("ServiceNow table name (e.g. 'incident', 'sys_user')"),
+        sys_id: z.string().describe("The 32-character sys_id of the record"),
+        fields: z
+          .string()
+          .optional()
+          .describe("Comma-separated field names to return"),
+        displayValue: z
+          .enum(["true", "false", "all"])
+          .optional()
+          .describe("Return display values instead of raw: 'true', 'false', or 'all'"),
+      },
+      annotations: {
+        readOnlyHint: true,
+      },
+    },
+    async ({ tableName, sys_id, fields, displayValue }) => {
+      try {
+        const record = await client.getRecord(tableName, sys_id, {
+          fields,
+          displayValue,
+        });
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(record, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? error.message : String(error),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "create_record",
+    {
+      description:
+        "Create a new record in a ServiceNow table. Returns the created record.",
+      inputSchema: {
+        tableName: z
+          .string()
+          .describe("ServiceNow table name (e.g. 'incident', 'change_request')"),
+        body: z
+          .record(z.string(), z.unknown())
+          .describe(
+            "Field values for the new record (e.g. { \"short_description\": \"New issue\", \"priority\": \"1\" })",
+          ),
+      },
+      annotations: {
+        destructiveHint: false,
+      },
+    },
+    async ({ tableName, body }) => {
+      try {
+        const record = await client.createRecord(tableName, body);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(record, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? error.message : String(error),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  server.registerTool(
+    "update_record",
+    {
+      description:
+        "Update an existing record in a ServiceNow table using PATCH (partial update). Only the provided fields are modified.",
+      inputSchema: {
+        tableName: z
+          .string()
+          .describe("ServiceNow table name (e.g. 'incident', 'sys_user')"),
+        sys_id: z.string().describe("The 32-character sys_id of the record to update"),
+        body: z
+          .record(z.string(), z.unknown())
+          .describe(
+            "Field values to update (e.g. { \"state\": \"2\", \"assigned_to\": \"admin\" })",
+          ),
+      },
+      annotations: {
+        destructiveHint: false,
+      },
+    },
+    async ({ tableName, sys_id, body }) => {
+      try {
+        const record = await client.updateRecord(tableName, sys_id, body);
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(record, null, 2),
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: error instanceof Error ? error.message : String(error),
+            },
+          ],
+          isError: true,
+        };
+      }
+    },
+  );
+}
