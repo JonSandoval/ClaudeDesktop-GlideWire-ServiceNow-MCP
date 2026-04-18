@@ -31,7 +31,7 @@ const tokenManager = new TokenManager({ instanceUrl, clientId, clientSecret, red
 const snClient = new ServiceNowClient(instanceUrl, tokenManager);
 
 const server = new McpServer({
-  name: "servicenow",
+  name: "GlideWire ServiceNow MCP",
   version: "1.0.0",
 });
 

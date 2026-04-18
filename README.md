@@ -1,4 +1,13 @@
-# ServiceNow MCP Server
+<div align="center">
+  <img src="logo.png" alt="GlideWire ServiceNow MCP" width="250" />
+
+  # GlideWire ServiceNow MCP Server
+
+  [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](#prerequisites)
+  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#step-2-install-and-build)
+  [![OAuth 2.0](https://img.shields.io/badge/auth-OAuth_2.0-blue.svg)](#how-authorization-works)
+  [![ServiceNow](https://img.shields.io/badge/integration-ServiceNow-green.svg)](#)
+</div>
 
 A Model Context Protocol (MCP) server that connects Claude Desktop to your ServiceNow instance via the Table API. Authenticate with OAuth 2.0 and interact with any ServiceNow table directly from Claude.
 
@@ -74,7 +83,7 @@ Restart Claude Desktop after saving the file.
 
 ## How Authorization Works
 
-The server uses the OAuth 2.0 Authorization Code flow — no credentials are stored on disk.
+The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **RFC 6749 (Section 4.1)** for a "Confidential Client". It uses native Node.js libraries to process the authorization and token lifecycle without reliance on external third-party OAuth packages. No credentials are stored on disk.
 
 1. The first time you use a ServiceNow tool in Claude, a **browser window opens** to your ServiceNow instance
 2. Log in and click **Allow** to grant access
@@ -85,21 +94,77 @@ The server uses the OAuth 2.0 Authorization Code flow — no credentials are sto
 
 ---
 
-## Available Tools
+## Available Tools (32)
+
+### Core CRUD
 
 | Tool | Description |
 |------|-------------|
-| `list_records` | List records from any table with optional filtering, field selection, and pagination |
+| `list_records` | List records from any table with filtering, field selection, and pagination |
 | `get_record` | Retrieve a single record by its `sys_id` |
 | `create_record` | Create a new record in a table |
 | `update_record` | Partially update an existing record (only the fields you provide are changed) |
 
+### Access Intelligence
+
+| Tool | Description |
+|------|-------------|
+| `get_user` | Find a user by username, email, or sys_id |
+| `get_user_group_memberships` | List all groups a user belongs to |
+| `get_group_members` | List all active users in a group |
+| `get_user_direct_roles` | Get roles directly assigned to a user (not via groups) |
+| `get_user_effective_roles` | Get all effective roles for a user (direct + group-derived) |
+| `get_group_roles` | Get roles assigned to a group |
+| `get_roles` | Search and list available roles |
+| `get_groups` | Search and list user groups |
+| `get_role_contains_roles` | List sub-roles that a role contains (auto-granted roles) |
+| `get_role_contained_by` | List parent roles that contain a given role |
+| `compare_user_groups` | Compare group memberships of two users |
+| `compare_user_direct_roles` | Compare direct role assignments of two users |
+| `compare_user_effective_roles` | Compare effective roles (direct + group-derived) of two users |
+| `compare_user_access` | **Primary tool** — comprehensive access comparison: groups, direct roles, and effective roles |
+| `explain_user_role_source` | Explain how a user has a specific role (direct, group, or role containment) |
+| `compare_group_access` | Compare two groups: member overlap and role overlap |
+
+### Admin & Hygiene
+
+| Tool | Description |
+|------|-------------|
+| `aggregate_records` | Count or aggregate records using the Aggregate API (groupBy, having, sum/avg/min/max) |
+| `get_record_by_number` | Get a record by its human-readable number (e.g. INC0001234, CHG0000123) |
+| `add_work_note` | Append a work note to a task record (incident, change, problem, etc.) |
+| `queue_health` | Snapshot of an assignment group's queue: total count, by priority, by state, by assignee |
+| `find_stale_records` | Find records not updated in X days |
+| `find_duplicate_users` | Find users with duplicate email or employee number |
+| `find_orphaned_groups` | Find groups with no active members |
+
+### Attachments
+
+| Tool | Description |
+|------|-------------|
+| `list_attachments` | List attachments on a record (metadata only) |
+| `upload_attachment` | Upload a file to a record (base64-encoded content) |
+| `download_attachment` | Download an attachment's content (returns base64) |
+
+### CMDB
+
+| Tool | Description |
+|------|-------------|
+| `get_ci` | Get a Configuration Item by name, serial number, asset tag, or sys_id |
+| `list_cis_by_class` | List CIs of a specific CMDB class with filtering and pagination |
+
 ### Example prompts
 
 - *"List the 5 most recent open incidents"*
-- *"Get the incident with sys_id abc123..."*
+- *"Get incident INC0010001"*
 - *"Create a high priority incident for the login page being down"*
-- *"Update incident INC0010001 to assign it to the network team"*
+- *"Compare the access of user jsmith and user jdoe"*
+- *"Explain how user admin got the itil role"*
+- *"Show me the queue health for the Network team"*
+- *"Find incidents that haven't been updated in 30 days"*
+- *"Find groups with no members"*
+- *"List attachments on CHG0000123"*
+- *"Look up the server named db-prod-01 in the CMDB"*
 
 ---
 

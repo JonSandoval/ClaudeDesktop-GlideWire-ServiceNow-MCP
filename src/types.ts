@@ -32,3 +32,25 @@ export class ServiceNowApiError extends Error {
     this.name = "ServiceNowApiError";
   }
 }
+
+export interface AggregateParams {
+  query?: string;
+  groupBy?: string;
+  having?: string;
+  orderBy?: string;
+  count?: boolean;
+  sumFields?: string;
+  avgFields?: string;
+  minFields?: string;
+  maxFields?: string;
+  limit?: number;
+}
+
+export interface AttachmentRecord {
+  sys_id: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: string;
+  table_name: string;
+  table_sys_id: string;
+}

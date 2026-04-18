@@ -1,9 +1,9 @@
 {
-  "name": "servicenow-mcp",
+  "name": "glidewire-servicenow-mcp",
   "version": "1.0.0",
   "type": "module",
   "bin": {
-    "servicenow-mcp": "dist/index.js"
+    "glidewire-servicenow-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
