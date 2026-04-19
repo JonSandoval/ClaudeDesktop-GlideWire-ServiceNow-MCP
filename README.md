@@ -38,7 +38,7 @@ Before installing the server, you need to create an OAuth application in Service
 
 ```bash
 git clone <repo-url>
-cd servicenow-mcp
+cd glidewire-servicenow-mcp
 npm install
 npm run build
 ```
@@ -61,7 +61,7 @@ Add the `mcpServers` block below, replacing the placeholder values with your own
   "mcpServers": {
     "servicenow": {
       "command": "node",
-      "args": ["/absolute/path/to/servicenow-mcp/dist/index.js"],
+      "args": ["/absolute/path/to/glidewire-servicenow-mcp/dist/index.js"],
       "env": {
         "SERVICENOW_INSTANCE_URL": "https://your-instance.service-now.com",
         "SERVICENOW_CLIENT_ID": "your-client-id",
@@ -75,7 +75,7 @@ Add the `mcpServers` block below, replacing the placeholder values with your own
 
 > **Note:** If your config file already has an `mcpServers` key, add `servicenow` inside the existing object — do not create a second `mcpServers` key.
 
-> **Windows path example:** `"args": ["C:/Users/YourName/servicenow-mcp/dist/index.js"]`
+> **Windows path example:** `"args": ["C:/Users/YourName/glidewire-servicenow-mcp/dist/index.js"]`
 
 Restart Claude Desktop after saving the file.
 
@@ -94,7 +94,7 @@ The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **
 
 ---
 
-## Available Tools (32)
+## Available Tools (38)
 
 ### Core CRUD
 
@@ -153,6 +153,19 @@ The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **
 | `get_ci` | Get a Configuration Item by name, serial number, asset tag, or sys_id |
 | `list_cis_by_class` | List CIs of a specific CMDB class with filtering and pagination |
 
+### Developer & Architect Insights
+
+Read-only tools for understanding platform structure, technical debt, and governance posture.
+
+| Tool | Description |
+|------|-------------|
+| `get_table_fields` | Return field metadata for a table — types, mandatory flags, reference targets, and which fields are inherited from parent tables |
+| `summarize_flow_failures` | Summarize Flow Designer execution failures over a time window, ranked by flow and grouped by error state |
+| `summarize_instance_customization` | High-level view of instance customization: custom tables, scoped apps, and custom fields |
+| `summarize_access_model` | Summarize users, groups, roles, direct vs. group-inherited assignments, and privileged-role distribution |
+| `get_integration_inventory` | Inventory integration touchpoints: connection aliases, REST messages, and SOAP messages (credentials never returned) |
+| `find_stale_artifacts` | Find likely stale artifacts for review: open update sets, idle scheduled jobs, old reports, and inactive flows |
+
 ### Example prompts
 
 - *"List the 5 most recent open incidents"*
@@ -165,6 +178,12 @@ The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **
 - *"Find groups with no members"*
 - *"List attachments on CHG0000123"*
 - *"Look up the server named db-prod-01 in the CMDB"*
+- *"What fields are on the incident table, including inherited ones?"*
+- *"Which flows have been failing most in the last 7 days?"*
+- *"How customized is this ServiceNow instance?"*
+- *"Summarize the access model — how many users have the admin role?"*
+- *"What integrations are configured on this instance?"*
+- *"Find update sets and scheduled jobs that haven't been touched in 6 months"*
 
 ---
 

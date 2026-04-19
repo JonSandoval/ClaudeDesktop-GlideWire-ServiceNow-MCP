@@ -182,6 +182,14 @@ const sampleInputs = {
   // CMDB
   get_ci: { identifier: "web-server-01", identifierType: "name" },
   list_cis_by_class: { ciClass: "cmdb_ci_server", limit: 10 },
+
+  // Developer & Architect Insights
+  get_table_fields: { table_name: "incident", include_inherited: false, include_reference_details: true, include_attributes: false },
+  summarize_flow_failures: { time_window_days: 7, max_flows: 10 },
+  summarize_instance_customization: { include_table_breakdown: true, include_app_breakdown: true, include_custom_only: false },
+  summarize_access_model: { include_privileged_roles: true, include_group_role_analysis: true },
+  get_integration_inventory: { include_aliases: true, include_connection_details: false, include_app_context: true },
+  find_stale_artifacts: { artifact_types: ["update_sets", "scheduled_jobs", "reports", "flows"], stale_after_days: 180, include_inactive_only: false, max_results_per_type: 10 },
 };
 
 console.log(`\nTesting ${toolNames.length} tools...\n`);

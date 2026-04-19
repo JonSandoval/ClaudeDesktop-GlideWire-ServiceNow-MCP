@@ -4,6 +4,7 @@ import { registerAccessTools } from "./access.js";
 import { registerAdminTools } from "./admin.js";
 import { registerAttachmentTools } from "./attachments.js";
 import { registerCmdbTools } from "./cmdb.js";
+import { registerInsightTools } from "./insights.js";
 
 export { wrapTool } from "./utils.js";
 
@@ -13,6 +14,7 @@ export function registerTools(server: McpServer, client: ServiceNowClient): void
   registerAdminTools(server, client);
   registerAttachmentTools(server, client);
   registerCmdbTools(server, client);
+  registerInsightTools(server, client);
 }
 
 /** The original four generic CRUD tools. */
