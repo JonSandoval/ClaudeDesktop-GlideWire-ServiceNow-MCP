@@ -1,6 +1,12 @@
 {
   "name": "glidewire-servicenow-mcp",
   "version": "1.0.0",
+  "description": "A Model Context Protocol (MCP) server that connects Claude Desktop to your ServiceNow instance via the Table API.",
+  "author": "JonSandoval",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JonSandoval/ClaudeDesktop-GlideWire-ServiceNow-MCP.git"
+  },
   "type": "module",
   "bin": {
     "glidewire-servicenow-mcp": "dist/index.js"

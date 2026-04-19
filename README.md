@@ -37,7 +37,7 @@ Before installing the server, you need to create an OAuth application in Service
 ## Step 2: Install and Build
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/JonSandoval/ClaudeDesktop-GlideWire-ServiceNow-MCP.git
 cd glidewire-servicenow-mcp
 npm install
 npm run build
