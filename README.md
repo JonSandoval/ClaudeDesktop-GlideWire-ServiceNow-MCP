@@ -43,7 +43,7 @@ npm install
 npm run build
 ```
 
-This compiles the TypeScript source into `dist/`. You only need to run this once (and again after any updates).
+This compiles the TypeScript source into `dist/`. Claude Desktop launches the server by running `node dist/index.js` directly, so the build step is required once before you configure Claude — and again any time you update the source.
 
 ---
 
