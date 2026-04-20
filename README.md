@@ -166,6 +166,57 @@ Read-only tools for understanding platform structure, technical debt, and govern
 | `get_integration_inventory` | Inventory integration touchpoints: connection aliases, REST messages, and SOAP messages (credentials never returned) |
 | `find_stale_artifacts` | Find likely stale artifacts for review: open update sets, idle scheduled jobs, old reports, and inactive flows |
 
+---
+
+## API Reference
+
+<details>
+<summary><strong>ServiceNow REST Endpoints</strong></summary>
+
+All tools communicate with ServiceNow through these eight REST endpoints. Auth is Bearer token (OAuth 2.0); 401s trigger a one-shot token refresh and 429s use exponential backoff up to 3 retries.
+
+| Endpoint | Method | Used by |
+|---|---|---|
+| `/api/now/table/{tableName}` | GET | `list_records`, all tools that read table data |
+| `/api/now/table/{tableName}/{sysId}` | GET | `get_record`, `get_user` (sys_id path), `get_ci` (sys_id path) |
+| `/api/now/table/{tableName}` | POST | `create_record` |
+| `/api/now/table/{tableName}/{sysId}` | PATCH | `update_record`, `add_work_note` |
+| `/api/now/stats/{tableName}` | GET | `aggregate_records`, `queue_health`, `find_duplicate_users`, `find_orphaned_groups`, `summarize_access_model` |
+| `/api/now/attachment` | GET | `list_attachments` |
+| `/api/now/attachment/file` | POST | `upload_attachment` |
+| `/api/now/attachment/{sysId}/file` | GET | `download_attachment` |
+
+</details>
+
+<details>
+<summary><strong>ServiceNow Tables</strong></summary>
+
+| Table | Used by |
+|---|---|
+| `sys_user` | `get_user`, `find_duplicate_users`, `summarize_access_model` |
+| `sys_user_group` | `get_groups`, `get_group_members`, `get_group_roles`, `compare_group_access`, `queue_health`, `find_orphaned_groups` |
+| `sys_user_grmember` | `get_user_group_memberships`, `get_group_members`, `get_user_effective_roles`, `compare_user_*`, `explain_user_role_source`, `find_orphaned_groups` |
+| `sys_user_has_role` | `get_user_direct_roles`, `get_user_effective_roles`, `compare_user_*`, `explain_user_role_source`, `summarize_access_model` |
+| `sys_group_has_role` | `get_group_roles`, `get_user_effective_roles`, `compare_user_*`, `compare_group_access`, `explain_user_role_source`, `summarize_access_model` |
+| `sys_user_role` | `get_roles`, `get_role_contains_roles`, `get_role_contained_by`, `explain_user_role_source`, `summarize_access_model` |
+| `sys_user_role_contains` | `get_role_contains_roles`, `get_role_contained_by`, `explain_user_role_source` |
+| `cmdb_ci` (and subclasses) | `get_ci`, `list_cis_by_class` |
+| `sys_dictionary` | `get_table_fields`, `summarize_instance_customization` |
+| `sys_db_object` | `get_table_fields`, `summarize_instance_customization` |
+| `sys_flow_context` | `summarize_flow_failures` |
+| `sys_hub_flow` | `find_stale_artifacts` |
+| `sys_connection_alias` | `get_integration_inventory` |
+| `sys_rest_message` | `get_integration_inventory` |
+| `sys_soap_message` | `get_integration_inventory` |
+| `sys_update_set` | `find_stale_artifacts` |
+| `sysauto_script` | `find_stale_artifacts` |
+| `sys_report` | `find_stale_artifacts` |
+| `sys_scope` | `summarize_instance_customization` |
+
+</details>
+
+---
+
 ### Example prompts
 
 - *"List the 5 most recent open incidents"*
