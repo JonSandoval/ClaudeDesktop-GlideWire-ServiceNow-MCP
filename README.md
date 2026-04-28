@@ -242,6 +242,8 @@ All tools communicate with ServiceNow through these eight REST endpoints. Auth i
 
 ## Environment Variables
 
+> **Note on `.env` files:** Claude Desktop passes these variables directly via `claude_desktop_config.json` and does **not** use a `.env` file. However, a `.env.example` file is provided in the repository if you want to run or test the MCP server standalone (e.g., using the MCP Inspector).
+
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `SERVICENOW_INSTANCE_URL` | Yes | — | Your instance URL, e.g. `https://dev12345.service-now.com` |
@@ -266,3 +268,21 @@ Change `SERVICENOW_REDIRECT_PORT` to another port (e.g. `9000`) and update the *
 - Verify the Client ID and Secret are copied correctly (no extra spaces)
 - Confirm the Redirect URL in ServiceNow exactly matches `http://localhost:{port}/callback`
 - Ensure the OAuth app in ServiceNow is active
+
+---
+
+## Development & Testing
+
+If you are contributing to this project or modifying the tools, a comprehensive integration test suite is provided. This test suite uses a mocked ServiceNow client to verify that all tools are registered correctly, queries are safely constructed, and they return valid MCP response shapes without needing a live ServiceNow connection.
+
+To run the tests:
+```bash
+npm run build
+node test-tools.mjs
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
