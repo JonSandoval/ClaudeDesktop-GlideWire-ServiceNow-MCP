@@ -8,6 +8,8 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTools } from "./dist/tools.js";
+import { parseRetryAfterMs } from "./dist/servicenow.js";
+import { assertSafeQueryValue, safeEq } from "./dist/tools/utils.js";
 
 // ── Mock Client ──────────────────────────────────────────────────────────────
 
@@ -91,6 +93,40 @@ const toolNames = Object.keys(tools).sort();
 let passed = 0;
 let failed = 0;
 const failures = [];
+
+function runGuardrailTests() {
+  const nowMs = Date.UTC(2026, 0, 1, 0, 0, 0);
+  const httpDate = new Date(nowMs + 15_000).toUTCString();
+  const guardrailChecks = [
+    { name: "safeEq allows normal value", run: () => safeEq("name", "Network Team") === "name=Network Team" },
+    { name: "assertSafeQueryValue rejects caret", run: () => {
+      try {
+        assertSafeQueryValue("bad^value", "test");
+        return false;
+      } catch {
+        return true;
+      }
+    } },
+    { name: "assertSafeQueryValue rejects newline", run: () => {
+      try {
+        assertSafeQueryValue("bad\nvalue", "test");
+        return false;
+      } catch {
+        return true;
+      }
+    } },
+    { name: "parseRetryAfterMs handles delta seconds", run: () => parseRetryAfterMs("10", nowMs) === 10_000 },
+    { name: "parseRetryAfterMs handles HTTP-date", run: () => parseRetryAfterMs(httpDate, nowMs) === 15_000 },
+    { name: "parseRetryAfterMs rejects malformed header", run: () => parseRetryAfterMs("abc", nowMs) === null },
+    { name: "parseRetryAfterMs rejects past date", run: () => parseRetryAfterMs("Wed, 31 Dec 2025 23:59:00 GMT", nowMs) === null },
+  ];
+
+  for (const check of guardrailChecks) {
+    if (!check.run()) {
+      throw new Error(`Guardrail check failed: ${check.name}`);
+    }
+  }
+}
 
 // Sample inputs for each tool
 const sampleInputs = {
@@ -193,6 +229,7 @@ const sampleInputs = {
 };
 
 console.log(`\nTesting ${toolNames.length} tools...\n`);
+runGuardrailTests();
 
 for (const name of toolNames) {
   const tool = tools[name];

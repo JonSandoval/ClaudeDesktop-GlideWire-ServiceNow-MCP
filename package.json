@@ -8,13 +8,18 @@
     "url": "https://github.com/JonSandoval/ClaudeDesktop-GlideWire-ServiceNow-MCP.git"
   },
   "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "bin": {
     "glidewire-servicenow-mcp": "dist/index.js"
   },
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "tsc && node test-tools.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

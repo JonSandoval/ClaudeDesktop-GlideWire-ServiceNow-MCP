@@ -96,6 +96,8 @@ The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **
 
 ## Available Tools (38)
 
+> **Note:** Write tools (`create_record`, `update_record`, `add_work_note`, `upload_attachment`) will prompt for your confirmation in Claude Desktop before executing. Read-only tools run without a prompt.
+
 ### Core CRUD
 
 | Tool | Description |
