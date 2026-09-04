@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ServiceNowClient } from "../servicenow.js";
-import { wrapTool } from "./utils.js";
+import { safeEq, safeLike, wrapTool } from "./utils.js";
 
 function staleDateString(daysBack: number): string {
   return new Date(Date.now() - daysBack * 86_400_000)
@@ -61,7 +61,7 @@ export function registerInsightTools(
           let current = table_name;
           for (let depth = 0; depth < MAX_DEPTH; depth++) {
             const tableRecs = await client.listRecords("sys_db_object", {
-              query: `name=${current}`,
+              query: safeEq("name", current, "table name"),
               fields: "name,super_class",
               limit: 1,
               displayValue: "all",
@@ -96,7 +96,7 @@ export function registerInsightTools(
         for (const tableName of tableChain) {
           const isInherited = tableName !== table_name;
           const dictRecords = await client.listRecords("sys_dictionary", {
-            query: `name=${tableName}^elementISNOTEMPTY^active=true`,
+            query: `${safeEq("name", tableName, "table name")}^elementISNOTEMPTY^active=true`,
             fields: fieldList,
             limit: 500,
             displayValue: "true",
@@ -201,8 +201,10 @@ export function registerInsightTools(
         const cutoff = staleDateString(windowDays);
 
         const queryParts = [`stateINerror,cancelled`, `sys_created_on>${cutoff}`];
-        if (flow_name_contains) queryParts.push(`nameLIKE${flow_name_contains}`);
-        if (scope) queryParts.push(`scope=${scope}`);
+        if (flow_name_contains) {
+          queryParts.push(safeLike("name", flow_name_contains, "flow name filter"));
+        }
+        if (scope) queryParts.push(safeEq("scope", scope, "flow scope"));
 
         const contexts = await client.listRecords("sys_flow_context", {
           query: queryParts.join("^"),
@@ -468,13 +470,13 @@ export function registerInsightTools(
           for (const roleName of privilegedRoles) {
             const [directUsers, groupsWithRole] = await Promise.all([
               client.listRecords("sys_user_has_role", {
-                query: `role.name=${roleName}^state=active^inherited=false`,
+                query: `${safeEq("role.name", roleName, "privileged role name")}^state=active^inherited=false`,
                 fields: "user,role",
                 limit: pageLimit,
                 displayValue: "true",
               }),
               client.listRecords("sys_group_has_role", {
-                query: `role.name=${roleName}`,
+                query: safeEq("role.name", roleName, "privileged role name"),
                 fields: "group,role",
                 limit: pageLimit,
                 displayValue: "true",

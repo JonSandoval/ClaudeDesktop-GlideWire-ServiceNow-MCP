@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ServiceNowClient } from "../servicenow.js";
-import { wrapTool } from "./utils.js";
+import { safeEq, wrapTool } from "./utils.js";
 
 export function registerCmdbTools(server: McpServer, client: ServiceNowClient): void {
   server.registerTool(
@@ -47,7 +47,7 @@ export function registerCmdbTools(server: McpServer, client: ServiceNowClient): 
         };
         const field = fieldMap[identifierType ?? "name"] ?? "name";
         const records = await client.listRecords(table, {
-          query: `${field}=${identifier}`,
+          query: safeEq(field, identifier, "CI identifier"),
           fields,
           limit: 5,
           displayValue: "true",

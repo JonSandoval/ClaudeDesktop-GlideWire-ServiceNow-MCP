@@ -1,7 +1,17 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ServiceNowClient } from "../servicenow.js";
-import { wrapTool, extractRefValue, extractRefDisplay, buildRefSet, diffSets } from "./utils.js";
+import {
+  wrapTool,
+  extractRefValue,
+  extractRefDisplay,
+  buildRefSet,
+  diffSets,
+  safeEq,
+  safeLike,
+  safeSysIdEq,
+  safeSysIdIn,
+} from "./utils.js";
 
 export function registerAccessTools(server: McpServer, client: ServiceNowClient): void {
   // ─── Primitive Tools ─────────────────────────────────────────────────────────
@@ -37,7 +47,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         }
         const field = identifierType === "email" ? "email" : "user_name";
         const records = await client.listRecords("sys_user", {
-          query: `${field}=${identifier}`,
+          query: safeEq(field, identifier, "user identifier"),
           fields: fields ?? defaultFields,
           limit: 5,
           displayValue: "true",
@@ -62,7 +72,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
     async ({ userSysId }) => {
       return wrapTool(async () => {
         return client.listRecords("sys_user_grmember", {
-          query: `user=${userSysId}`,
+          query: safeSysIdEq("user", userSysId, "user sys_id"),
           fields: "group",
           limit: 500,
           displayValue: "all",
@@ -98,7 +108,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         if (!resolvedSysId) {
           if (!groupName) throw new Error("Either groupSysId or groupName must be provided");
           const groups = await client.listRecords("sys_user_group", {
-            query: `name=${groupName}`,
+            query: safeEq("name", groupName, "group name"),
             fields: "sys_id,name",
             limit: 1,
           });
@@ -106,7 +116,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
           resolvedSysId = groups[0].sys_id as string;
         }
         return client.listRecords("sys_user_grmember", {
-          query: `group=${resolvedSysId}^user.active=true`,
+          query: `${safeSysIdEq("group", resolvedSysId, "group sys_id")}^user.active=true`,
           fields: "user",
           limit: limit ?? 100,
           displayValue: "all",
@@ -132,9 +142,10 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
     },
     async ({ userSysId, includeInherited }) => {
       return wrapTool(async () => {
+        const userClause = safeSysIdEq("user", userSysId, "user sys_id");
         const query = includeInherited
-          ? `user=${userSysId}^state=active`
-          : `user=${userSysId}^state=active^inherited=false`;
+          ? `${userClause}^state=active`
+          : `${userClause}^state=active^inherited=false`;
         return client.listRecords("sys_user_has_role", {
           query,
           fields: "role,inherited",
@@ -159,13 +170,13 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
       return wrapTool(async () => {
         const [directRoles, groupMemberships] = await Promise.all([
           client.listRecords("sys_user_has_role", {
-            query: `user=${userSysId}^state=active`,
+            query: `${safeSysIdEq("user", userSysId, "user sys_id")}^state=active`,
             fields: "role,inherited",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_user_grmember", {
-            query: `user=${userSysId}`,
+            query: safeSysIdEq("user", userSysId, "user sys_id"),
             fields: "group",
             limit: 500,
             displayValue: "all",
@@ -182,7 +193,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         let groupRoles: typeof directRoles = [];
         if (groupSysIds.length > 0) {
           groupRoles = await client.listRecords("sys_group_has_role", {
-            query: `groupIN${groupSysIds.join(",")}`,
+            query: safeSysIdIn("group", groupSysIds),
             fields: "role,group",
             limit: 500,
             displayValue: "all",
@@ -222,7 +233,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         if (!resolvedSysId) {
           if (!groupName) throw new Error("Either groupSysId or groupName must be provided");
           const groups = await client.listRecords("sys_user_group", {
-            query: `name=${groupName}`,
+            query: safeEq("name", groupName, "group name"),
             fields: "sys_id,name",
             limit: 1,
           });
@@ -230,7 +241,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
           resolvedSysId = groups[0].sys_id as string;
         }
         return client.listRecords("sys_group_has_role", {
-          query: `group=${resolvedSysId}`,
+          query: safeSysIdEq("group", resolvedSysId, "group sys_id"),
           fields: "role,group",
           limit: 500,
           displayValue: "all",
@@ -261,7 +272,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
     },
     async ({ nameFilter, limit }) => {
       return wrapTool(async () => {
-        const query = nameFilter ? `nameLIKE${nameFilter}` : "";
+        const query = nameFilter ? safeLike("name", nameFilter, "role name filter") : "";
         return client.listRecords("sys_user_role", {
           query,
           fields: "sys_id,name,description,can_delegate",
@@ -300,7 +311,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
       return wrapTool(async () => {
         const parts: string[] = [];
         if (activeOnly) parts.push("active=true");
-        if (nameFilter) parts.push(`nameLIKE${nameFilter}`);
+        if (nameFilter) parts.push(safeLike("name", nameFilter, "group name filter"));
         const query = parts.join("^");
         return client.listRecords("sys_user_group", {
           query,
@@ -332,7 +343,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         if (!resolvedSysId) {
           if (!roleName) throw new Error("Either roleSysId or roleName must be provided");
           const roles = await client.listRecords("sys_user_role", {
-            query: `name=${roleName}`,
+            query: safeEq("name", roleName, "role name"),
             fields: "sys_id,name",
             limit: 1,
           });
@@ -340,7 +351,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
           resolvedSysId = roles[0].sys_id as string;
         }
         const containedRoles = await client.listRecords("sys_user_role_contains", {
-          query: `role=${resolvedSysId}`,
+          query: safeSysIdEq("role", resolvedSysId, "role sys_id"),
           fields: "contains",
           limit: 500,
           displayValue: "all",
@@ -376,7 +387,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         if (!resolvedSysId) {
           if (!roleName) throw new Error("Either roleSysId or roleName must be provided");
           const roles = await client.listRecords("sys_user_role", {
-            query: `name=${roleName}`,
+            query: safeEq("name", roleName, "role name"),
             fields: "sys_id,name",
             limit: 1,
           });
@@ -384,7 +395,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
           resolvedSysId = roles[0].sys_id as string;
         }
         const parentRoles = await client.listRecords("sys_user_role_contains", {
-          query: `contains=${resolvedSysId}`,
+          query: safeSysIdEq("contains", resolvedSysId, "role sys_id"),
           fields: "role",
           limit: 500,
           displayValue: "all",
@@ -417,13 +428,13 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
       return wrapTool(async () => {
         const [memberships1, memberships2] = await Promise.all([
           client.listRecords("sys_user_grmember", {
-            query: `user=${userSysId1}`,
+            query: safeSysIdEq("user", userSysId1, "first user sys_id"),
             fields: "group",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_user_grmember", {
-            query: `user=${userSysId2}`,
+            query: safeSysIdEq("user", userSysId2, "second user sys_id"),
             fields: "group",
             limit: 500,
             displayValue: "all",
@@ -471,13 +482,13 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
       return wrapTool(async () => {
         const [roles1, roles2] = await Promise.all([
           client.listRecords("sys_user_has_role", {
-            query: `user=${userSysId1}^state=active^inherited=false`,
+            query: `${safeSysIdEq("user", userSysId1, "first user sys_id")}^state=active^inherited=false`,
             fields: "role",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_user_has_role", {
-            query: `user=${userSysId2}^state=active^inherited=false`,
+            query: `${safeSysIdEq("user", userSysId2, "second user sys_id")}^state=active^inherited=false`,
             fields: "role",
             limit: 500,
             displayValue: "all",
@@ -526,13 +537,13 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         async function getEffectiveRoleIds(userSysId: string): Promise<Map<string, string>> {
           const [directRoles, groupMemberships] = await Promise.all([
             client.listRecords("sys_user_has_role", {
-              query: `user=${userSysId}^state=active`,
+              query: `${safeSysIdEq("user", userSysId, "user sys_id")}^state=active`,
               fields: "role",
               limit: 500,
               displayValue: "all",
             }),
             client.listRecords("sys_user_grmember", {
-              query: `user=${userSysId}`,
+              query: safeSysIdEq("user", userSysId, "user sys_id"),
               fields: "group",
               limit: 500,
               displayValue: "all",
@@ -552,7 +563,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
 
           if (groupIds.length > 0) {
             const groupRoles = await client.listRecords("sys_group_has_role", {
-              query: `groupIN${groupIds.join(",")}`,
+              query: safeSysIdIn("group", groupIds),
               fields: "role",
               limit: 500,
               displayValue: "all",
@@ -611,25 +622,25 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         // Run the four base fetches in parallel
         const [groups1, groups2, directRoles1, directRoles2] = await Promise.all([
           client.listRecords("sys_user_grmember", {
-            query: `user=${userSysId1}`,
+            query: safeSysIdEq("user", userSysId1, "first user sys_id"),
             fields: "group",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_user_grmember", {
-            query: `user=${userSysId2}`,
+            query: safeSysIdEq("user", userSysId2, "second user sys_id"),
             fields: "group",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_user_has_role", {
-            query: `user=${userSysId1}^state=active^inherited=false`,
+            query: `${safeSysIdEq("user", userSysId1, "first user sys_id")}^state=active^inherited=false`,
             fields: "role",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_user_has_role", {
-            query: `user=${userSysId2}^state=active^inherited=false`,
+            query: `${safeSysIdEq("user", userSysId2, "second user sys_id")}^state=active^inherited=false`,
             fields: "role",
             limit: 500,
             displayValue: "all",
@@ -683,7 +694,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
           const [groupRoles1, groupRoles2] = await Promise.all([
             gids1.length > 0
               ? client.listRecords("sys_group_has_role", {
-                  query: `groupIN${gids1.join(",")}`,
+                  query: safeSysIdIn("group", gids1),
                   fields: "role",
                   limit: 500,
                   displayValue: "all",
@@ -691,7 +702,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
               : Promise.resolve([]),
             gids2.length > 0
               ? client.listRecords("sys_group_has_role", {
-                  query: `groupIN${gids2.join(",")}`,
+                  query: safeSysIdIn("group", gids2),
                   fields: "role",
                   limit: 500,
                   displayValue: "all",
@@ -748,7 +759,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
       return wrapTool(async () => {
         // Resolve role sys_id
         const roleRecords = await client.listRecords("sys_user_role", {
-          query: `name=${roleName}`,
+          query: safeEq("name", roleName, "role name"),
           fields: "sys_id,name,description",
           limit: 1,
         });
@@ -760,13 +771,13 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         // Check all three sources in parallel
         const [directAssignment, groupMemberships] = await Promise.all([
           client.listRecords("sys_user_has_role", {
-            query: `user=${userSysId}^role.name=${roleName}^state=active`,
+            query: `${safeSysIdEq("user", userSysId, "user sys_id")}^${safeEq("role.name", roleName, "role name")}^state=active`,
             fields: "role,inherited",
             limit: 5,
             displayValue: "all",
           }),
           client.listRecords("sys_user_grmember", {
-            query: `user=${userSysId}`,
+            query: safeSysIdEq("user", userSysId, "user sys_id"),
             fields: "group",
             limit: 500,
             displayValue: "all",
@@ -791,7 +802,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
 
         if (groupIds.length > 0) {
           const groupsWithRole = await client.listRecords("sys_group_has_role", {
-            query: `groupIN${groupIds.join(",")}^role=${roleSysId}`,
+            query: `${safeSysIdIn("group", groupIds)}^${safeSysIdEq("role", roleSysId, "role sys_id")}`,
             fields: "group,role",
             limit: 50,
             displayValue: "all",
@@ -810,7 +821,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
         if (sources.length === 0) {
           // No direct or group source found; check if any of the user's roles contain the target role
           const userDirectRoles = await client.listRecords("sys_user_has_role", {
-            query: `user=${userSysId}^state=active^inherited=false`,
+            query: `${safeSysIdEq("user", userSysId, "user sys_id")}^state=active^inherited=false`,
             fields: "role",
             limit: 500,
             displayValue: "all",
@@ -821,7 +832,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
 
           if (directRoleIds.length > 0) {
             const containmentRecords = await client.listRecords("sys_user_role_contains", {
-              query: `roleIN${directRoleIds.join(",")}^contains=${roleSysId}`,
+              query: `${safeSysIdIn("role", directRoleIds)}^${safeSysIdEq("contains", roleSysId, "role sys_id")}`,
               fields: "role,contains",
               limit: 50,
               displayValue: "all",
@@ -871,7 +882,7 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
           if (sysId) return sysId;
           if (!name) throw new Error("Provide either groupSysId or groupName for each group");
           const groups = await client.listRecords("sys_user_group", {
-            query: `name=${name}`,
+            query: safeEq("name", name, "group name"),
             fields: "sys_id,name",
             limit: 1,
           });
@@ -886,25 +897,25 @@ export function registerAccessTools(server: McpServer, client: ServiceNowClient)
 
         const [members1, members2, roles1, roles2] = await Promise.all([
           client.listRecords("sys_user_grmember", {
-            query: `group=${id1}^user.active=true`,
+            query: `${safeSysIdEq("group", id1, "first group sys_id")}^user.active=true`,
             fields: "user",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_user_grmember", {
-            query: `group=${id2}^user.active=true`,
+            query: `${safeSysIdEq("group", id2, "second group sys_id")}^user.active=true`,
             fields: "user",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_group_has_role", {
-            query: `group=${id1}`,
+            query: safeSysIdEq("group", id1, "first group sys_id"),
             fields: "role",
             limit: 500,
             displayValue: "all",
           }),
           client.listRecords("sys_group_has_role", {
-            query: `group=${id2}`,
+            query: safeSysIdEq("group", id2, "second group sys_id"),
             fields: "role",
             limit: 500,
             displayValue: "all",

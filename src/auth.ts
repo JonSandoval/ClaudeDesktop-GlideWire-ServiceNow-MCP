@@ -1,6 +1,6 @@
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import { randomBytes } from "node:crypto";
-import { exec } from "node:child_process";
+import { spawn } from "node:child_process";
 import { ServiceNowConfig, TokenResponse } from "./types.js";
 
 const TOKEN_REFRESH_BUFFER_MS = 120_000;
@@ -154,21 +154,30 @@ export class TokenManager {
 
   private openBrowser(url: string): void {
     const platform = process.platform;
-    let cmd: string;
+    let command: string;
+    let args: string[];
 
     if (platform === "win32") {
-      cmd = `start "" "${url}"`;
+      command = "explorer.exe";
+      args = [url];
     } else if (platform === "darwin") {
-      cmd = `open "${url}"`;
+      command = "/usr/bin/open";
+      args = [url];
     } else {
-      cmd = `xdg-open "${url}"`;
+      command = "xdg-open";
+      args = [url];
     }
 
-    exec(cmd, (err) => {
-      if (err) {
-        console.error("Could not open browser automatically. Please open the URL above manually.");
-      }
+    const child = spawn(command, args, {
+      detached: true,
+      shell: false,
+      stdio: "ignore",
+      windowsHide: true,
     });
+    child.once("error", () => {
+      console.error("Could not open browser automatically. Please open the URL above manually.");
+    });
+    child.unref();
   }
 
   private async exchangeCodeForToken(code: string): Promise<string> {

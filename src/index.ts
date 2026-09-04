@@ -15,17 +15,48 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
-const instanceUrl = getRequiredEnv("SERVICENOW_INSTANCE_URL").replace(/\/+$/, "");
+function getInstanceOrigin(value: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    console.error("SERVICENOW_INSTANCE_URL must be a valid HTTPS URL");
+    process.exit(1);
+  }
+
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    (parsed.pathname !== "" && parsed.pathname !== "/") ||
+    parsed.search !== "" ||
+    parsed.hash !== ""
+  ) {
+    console.error("SERVICENOW_INSTANCE_URL must be an HTTPS origin without credentials, path, query, or fragment");
+    process.exit(1);
+  }
+
+  return parsed.origin;
+}
+
+function getRedirectPort(value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  if (!/^\d+$/.test(value)) {
+    console.error("SERVICENOW_REDIRECT_PORT must be an integer from 1 to 65535");
+    process.exit(1);
+  }
+  const port = Number(value);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    console.error("SERVICENOW_REDIRECT_PORT must be an integer from 1 to 65535");
+    process.exit(1);
+  }
+  return port;
+}
+
+const instanceUrl = getInstanceOrigin(getRequiredEnv("SERVICENOW_INSTANCE_URL"));
 const clientId = getRequiredEnv("SERVICENOW_CLIENT_ID");
 const clientSecret = getRequiredEnv("SERVICENOW_CLIENT_SECRET");
-const redirectPort = process.env.SERVICENOW_REDIRECT_PORT
-  ? parseInt(process.env.SERVICENOW_REDIRECT_PORT, 10)
-  : undefined;
-
-if (!instanceUrl.startsWith("https://")) {
-  console.error("SERVICENOW_INSTANCE_URL must start with https://");
-  process.exit(1);
-}
+const redirectPort = getRedirectPort(process.env.SERVICENOW_REDIRECT_PORT);
 
 const tokenManager = new TokenManager({ instanceUrl, clientId, clientSecret, redirectPort });
 const snClient = new ServiceNowClient(instanceUrl, tokenManager);

@@ -9,7 +9,13 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTools } from "./dist/tools.js";
 import { parseRetryAfterMs } from "./dist/servicenow.js";
-import { assertSafeQueryValue, safeEq } from "./dist/tools/utils.js";
+import {
+  assertSafeQueryValue,
+  safeEq,
+  safeLike,
+  safeSysIdEq,
+  safeSysIdIn,
+} from "./dist/tools/utils.js";
 
 // ── Mock Client ──────────────────────────────────────────────────────────────
 
@@ -115,6 +121,27 @@ function runGuardrailTests() {
         return true;
       }
     } },
+    { name: "assertSafeQueryValue rejects server-side JavaScript", run: () => {
+      try {
+        assertSafeQueryValue("javascript:gs.getUserID()", "test");
+        return false;
+      } catch {
+        return true;
+      }
+    } },
+    { name: "safeLike builds a guarded LIKE clause", run: () => safeLike("name", "Network") === "nameLIKENetwork" },
+    { name: "safeSysIdEq rejects malformed sys_ids", run: () => {
+      try {
+        safeSysIdEq("user", "not-a-sys-id");
+        return false;
+      } catch {
+        return true;
+      }
+    } },
+    { name: "safeSysIdIn accepts sys_id lists", run: () =>
+      safeSysIdIn("group", ["a".repeat(32), "b".repeat(32)]) ===
+      `groupIN${"a".repeat(32)},${"b".repeat(32)}`
+    },
     { name: "parseRetryAfterMs handles delta seconds", run: () => parseRetryAfterMs("10", nowMs) === 10_000 },
     { name: "parseRetryAfterMs handles HTTP-date", run: () => parseRetryAfterMs(httpDate, nowMs) === 15_000 },
     { name: "parseRetryAfterMs rejects malformed header", run: () => parseRetryAfterMs("abc", nowMs) === null },
@@ -124,6 +151,24 @@ function runGuardrailTests() {
   for (const check of guardrailChecks) {
     if (!check.run()) {
       throw new Error(`Guardrail check failed: ${check.name}`);
+    }
+  }
+}
+
+async function runQueryInjectionIntegrationTests() {
+  const cases = [
+    ["get_user", { identifier: "admin^ORactive=true", identifierType: "username" }],
+    ["get_user_group_memberships", { userSysId: `a^ORuser=${"b".repeat(32)}` }],
+    ["get_record_by_number", { tableName: "incident", number: "INC1^ORactive=true" }],
+    ["get_ci", { identifier: "server^ORinstall_status=1", identifierType: "name" }],
+    ["summarize_flow_failures", { flow_name_contains: "flow^ORstate=complete" }],
+  ];
+
+  for (const [name, input] of cases) {
+    callLog.length = 0;
+    const result = await tools[name].handler(input);
+    if (!result.isError || callLog.length !== 0) {
+      throw new Error(`Encoded-query injection guard failed for ${name}`);
     }
   }
 }
@@ -230,6 +275,7 @@ const sampleInputs = {
 
 console.log(`\nTesting ${toolNames.length} tools...\n`);
 runGuardrailTests();
+await runQueryInjectionIntegrationTests();
 
 for (const name of toolNames) {
   const tool = tools[name];

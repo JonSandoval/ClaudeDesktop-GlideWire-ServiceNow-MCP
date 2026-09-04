@@ -27,6 +27,26 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Parse either supported Retry-After form: delta-seconds or an HTTP date. */
+export function parseRetryAfterMs(
+  value: string | null,
+  nowMs = Date.now(),
+): number | null {
+  if (value === null) return null;
+
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    return Number.isSafeInteger(seconds) ? seconds * 1000 : null;
+  }
+
+  const retryAtMs = Date.parse(trimmed);
+  if (!Number.isFinite(retryAtMs)) return null;
+
+  const delayMs = retryAtMs - nowMs;
+  return delayMs > 0 ? delayMs : null;
+}
+
 export interface ListRecordsParams {
   query?: string;
   fields?: string;
@@ -246,10 +266,11 @@ export class ServiceNowClient {
       // 429 - rate limited, exponential backoff
       if (response.status === 429 && retries < MAX_RETRIES) {
         retries++;
-        const retryAfter = response.headers.get("Retry-After");
-        const waitMs = retryAfter
-          ? Math.min(parseInt(retryAfter, 10) * 1000, MAX_RETRY_WAIT_MS)
-          : Math.min(1000 * Math.pow(2, retries), MAX_RETRY_WAIT_MS);
+        const retryAfterMs = parseRetryAfterMs(response.headers.get("Retry-After"));
+        const waitMs = Math.min(
+          retryAfterMs ?? 1000 * Math.pow(2, retries),
+          MAX_RETRY_WAIT_MS,
+        );
         await sleep(waitMs);
         continue;
       }

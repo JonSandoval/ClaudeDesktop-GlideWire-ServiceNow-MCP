@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { ServiceNowClient } from "../servicenow.js";
-import { wrapTool, extractRefValue } from "./utils.js";
+import { wrapTool, extractRefValue, safeEq, safeSysIdEq } from "./utils.js";
 
 export function registerAdminTools(server: McpServer, client: ServiceNowClient): void {
   server.registerTool(
@@ -85,7 +85,7 @@ export function registerAdminTools(server: McpServer, client: ServiceNowClient):
     async ({ tableName, number, fields }) => {
       return wrapTool(async () => {
         const records = await client.listRecords(tableName, {
-          query: `number=${number}`,
+          query: safeEq("number", number, "record number"),
           fields,
           limit: 1,
           displayValue: "true",
@@ -151,7 +151,7 @@ export function registerAdminTools(server: McpServer, client: ServiceNowClient):
         if (!resolvedSysId) {
           if (!groupName) throw new Error("Either groupSysId or groupName must be provided");
           const groups = await client.listRecords("sys_user_group", {
-            query: `name=${groupName}`,
+            query: safeEq("name", groupName, "group name"),
             fields: "sys_id,name",
             limit: 1,
           });
@@ -161,7 +161,7 @@ export function registerAdminTools(server: McpServer, client: ServiceNowClient):
 
         const table = tableName ?? "incident";
         const stateFilter = openStateQuery ?? "state!=6^state!=7";
-        const baseQuery = `assignment_group=${resolvedSysId}^${stateFilter}`;
+        const baseQuery = `${safeSysIdEq("assignment_group", resolvedSysId, "group sys_id")}^${stateFilter}`;
 
         const [totalResult, byPriority, byState, byAssignee] = await Promise.all([
           client.aggregateRecords(table, {
