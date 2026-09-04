@@ -4,7 +4,6 @@
   # GlideWire ServiceNow MCP Server
 
   [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](#prerequisites)
-  [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](#step-2-install-and-build)
   [![OAuth 2.0](https://img.shields.io/badge/auth-OAuth_2.0-blue.svg)](#how-authorization-works)
   [![ServiceNow](https://img.shields.io/badge/integration-ServiceNow-green.svg)](#)
 </div>
@@ -77,13 +76,17 @@ Add the `mcpServers` block below, replacing the placeholder values with your own
 
 > **Windows path example:** `"args": ["C:/Users/YourName/glidewire-servicenow-mcp/dist/index.js"]`
 
+> **Instance URL requirements:** `SERVICENOW_INSTANCE_URL` must be an HTTPS origin such as `https://dev12345.service-now.com`. Do not include credentials, a path, query parameters, or a fragment.
+
+> **Redirect port requirements:** `SERVICENOW_REDIRECT_PORT`, when provided, must be an integer from `1` through `65535`. The redirect URL configured in ServiceNow must use the same port.
+
 Restart Claude Desktop after saving the file.
 
 ---
 
 ## How Authorization Works
 
-The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **RFC 6749 (Section 4.1)** for a "Confidential Client". It uses native Node.js libraries to process the authorization and token lifecycle without reliance on external third-party OAuth packages. No credentials are stored on disk.
+The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **RFC 6749 (Section 4.1)** for a "Confidential Client". It uses native Node.js libraries to process the authorization and token lifecycle without reliance on external third-party OAuth packages. Access and refresh tokens are kept in memory only. The client ID and client secret remain in your Claude Desktop configuration, so protect that file and never commit it to source control.
 
 1. The first time you use a ServiceNow tool in Claude, a **browser window opens** to your ServiceNow instance
 2. Log in and click **Allow** to grant access
@@ -170,6 +173,14 @@ Read-only tools for understanding platform structure, technical debt, and govern
 
 ---
 
+## Query Safety
+
+Convenience tools that accept identifiers, names, or filters build ServiceNow encoded queries with guarded values. Encoded-query separators, line breaks, server-side `javascript:` expressions, and malformed `sys_id` values are rejected before a ServiceNow API request is made.
+
+Tools with an explicit `query`, `additionalQuery`, or query-fragment argument intentionally accept raw ServiceNow encoded-query syntax for advanced filtering. Treat those arguments as trusted input and grant the connected ServiceNow account only the roles and table access it needs.
+
+---
+
 ## API Reference
 
 <details>
@@ -242,14 +253,14 @@ All tools communicate with ServiceNow through these eight REST endpoints. Auth i
 
 ## Environment Variables
 
-> **Note on `.env` files:** Claude Desktop passes these variables directly via `claude_desktop_config.json` and does **not** use a `.env` file. However, a `.env.example` file is provided in the repository if you want to run or test the MCP server standalone (e.g., using the MCP Inspector).
+> **Note on `.env` files:** Claude Desktop passes these variables directly via `claude_desktop_config.json`; the server does not load `.env` files itself. For standalone use, set the variables in your shell or use a runner that loads a local `.env` file. Never commit client secrets or tokens.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `SERVICENOW_INSTANCE_URL` | Yes | — | Your instance URL, e.g. `https://dev12345.service-now.com` |
+| `SERVICENOW_INSTANCE_URL` | Yes | — | HTTPS origin only, e.g. `https://dev12345.service-now.com`; no credentials, path, query, or fragment |
 | `SERVICENOW_CLIENT_ID` | Yes | — | Client ID from the ServiceNow OAuth app |
 | `SERVICENOW_CLIENT_SECRET` | Yes | — | Client Secret from the ServiceNow OAuth app |
-| `SERVICENOW_REDIRECT_PORT` | No | `8443` | Local port for the OAuth callback server |
+| `SERVICENOW_REDIRECT_PORT` | No | `8443` | Integer from `1` through `65535` for the local OAuth callback server |
 
 ---
 
@@ -277,8 +288,7 @@ If you are contributing to this project or modifying the tools, a comprehensive 
 
 To run the tests:
 ```bash
-npm run build
-node test-tools.mjs
+npm test
 ```
 
 ---
