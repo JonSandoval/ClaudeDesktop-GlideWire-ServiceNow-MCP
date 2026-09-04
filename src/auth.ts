@@ -7,6 +7,44 @@ const TOKEN_REFRESH_BUFFER_MS = 120_000;
 const AUTH_TIMEOUT_MS = 120_000;
 const DEFAULT_REDIRECT_PORT = 8443;
 
+export type OAuthCallbackResult =
+  | { type: "invalid_state" }
+  | { type: "authorization_error"; error: string }
+  | { type: "missing_code" }
+  | { type: "success"; code: string };
+
+/** Evaluate an OAuth callback, always validating state before other parameters. */
+export function evaluateOAuthCallback(url: URL, expectedState: string): OAuthCallbackResult {
+  if (url.searchParams.get("state") !== expectedState) {
+    return { type: "invalid_state" };
+  }
+
+  const error = url.searchParams.get("error");
+  if (error) {
+    return { type: "authorization_error", error };
+  }
+
+  const code = url.searchParams.get("code");
+  return code ? { type: "success", code } : { type: "missing_code" };
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => {
+    const entities: Record<string, string> = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[character];
+  });
+}
+
+export function renderOAuthErrorPage(error: string): string {
+  return `<html><body><h1>Authorization Failed</h1><p>${escapeHtml(error)}</p><p>You can close this tab.</p></body></html>`;
+}
+
 export class TokenManager {
   private readonly instanceUrl: string;
   private readonly clientId: string;
@@ -96,38 +134,36 @@ export class TokenManager {
           return;
         }
 
-        const returnedState = url.searchParams.get("state");
-        const code = url.searchParams.get("code");
-        const error = url.searchParams.get("error");
+        const callback = evaluateOAuthCallback(url, state);
 
-        if (error) {
-          settled = true;
-          clearTimeout(timeout);
-          res.writeHead(400, { "Content-Type": "text/html" });
-          res.end(`<html><body><h1>Authorization Failed</h1><p>${error}</p><p>You can close this tab.</p></body></html>`);
-          callbackServer.close();
-          reject(new Error(`OAuth authorization denied: ${error}`));
-          return;
-        }
-
-        if (returnedState !== state) {
-          res.writeHead(400, { "Content-Type": "text/html" });
+        if (callback.type === "invalid_state") {
+          res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
           res.end(`<html><body><h1>Invalid State</h1><p>CSRF validation failed. Please try again.</p></body></html>`);
           return;
         }
 
-        if (!code) {
-          res.writeHead(400, { "Content-Type": "text/html" });
+        if (callback.type === "authorization_error") {
+          settled = true;
+          clearTimeout(timeout);
+          res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(renderOAuthErrorPage(callback.error));
+          callbackServer.close();
+          reject(new Error(`OAuth authorization denied: ${callback.error}`));
+          return;
+        }
+
+        if (callback.type === "missing_code") {
+          res.writeHead(400, { "Content-Type": "text/html; charset=utf-8" });
           res.end(`<html><body><h1>Missing Code</h1><p>No authorization code received.</p></body></html>`);
           return;
         }
 
         settled = true;
         clearTimeout(timeout);
-        res.writeHead(200, { "Content-Type": "text/html" });
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(`<html><body><h1>Authorization Successful</h1><p>You can close this tab and return to your application.</p></body></html>`);
         callbackServer.close();
-        resolve(code);
+        resolve(callback.code);
       });
 
       callbackServer.listen(this.redirectPort, "127.0.0.1", () => {

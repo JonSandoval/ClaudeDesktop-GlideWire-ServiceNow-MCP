@@ -88,6 +88,8 @@ Restart Claude Desktop after saving the file.
 
 The server uses the **OAuth 2.0 Authorization Code grant** flow as defined in **RFC 6749 (Section 4.1)** for a "Confidential Client". It uses native Node.js libraries to process the authorization and token lifecycle without reliance on external third-party OAuth packages. Access and refresh tokens are kept in memory only. The client ID and client secret remain in your Claude Desktop configuration, so protect that file and never commit it to source control.
 
+The callback server listens only on the local loopback interface and validates the per-authorization `state` value before processing either an authorization code or an OAuth error. Callback error text is escaped before it is displayed in the browser.
+
 1. The first time you use a ServiceNow tool in Claude, a **browser window opens** to your ServiceNow instance
 2. Log in and click **Allow** to grant access
 3. Your browser shows **"Authorization Successful"** — you can close the tab

@@ -8,6 +8,7 @@
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerTools } from "./dist/tools.js";
+import { evaluateOAuthCallback, renderOAuthErrorPage } from "./dist/auth.js";
 import { parseRetryAfterMs } from "./dist/servicenow.js";
 import {
   assertSafeQueryValue,
@@ -103,7 +104,31 @@ const failures = [];
 function runGuardrailTests() {
   const nowMs = Date.UTC(2026, 0, 1, 0, 0, 0);
   const httpDate = new Date(nowMs + 15_000).toUTCString();
+  const maliciousOAuthError = '<script>alert("oauth")</script>';
+  const invalidStateCallback = evaluateOAuthCallback(
+    new URL(`http://localhost/callback?state=wrong&error=${encodeURIComponent(maliciousOAuthError)}`),
+    "expected",
+  );
+  const validStateErrorCallback = evaluateOAuthCallback(
+    new URL(`http://localhost/callback?state=expected&error=${encodeURIComponent(maliciousOAuthError)}`),
+    "expected",
+  );
+  const escapedOAuthErrorPage =
+    validStateErrorCallback.type === "authorization_error"
+      ? renderOAuthErrorPage(validStateErrorCallback.error)
+      : "";
   const guardrailChecks = [
+    {
+      name: "OAuth callback validates state before processing errors",
+      run: () => invalidStateCallback.type === "invalid_state",
+    },
+    {
+      name: "OAuth callback escapes malicious error markup",
+      run: () =>
+        validStateErrorCallback.type === "authorization_error" &&
+        !escapedOAuthErrorPage.includes("<script>") &&
+        escapedOAuthErrorPage.includes("&lt;script&gt;"),
+    },
     { name: "safeEq allows normal value", run: () => safeEq("name", "Network Team") === "name=Network Team" },
     { name: "assertSafeQueryValue rejects caret", run: () => {
       try {
